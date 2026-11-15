@@ -18,6 +18,7 @@ $scriptlogs_text = [
     'loadError' => scriptlogs_t('Error loading script states. Check browser console (F12) for details.'),
     'run' => scriptlogs_t('Run'),
     'runTitle' => scriptlogs_t('Run the selected script in the background'),
+    'runTitleNamed' => scriptlogs_t('Run "%s" in the background'),
     'confirmTitle' => scriptlogs_t('Run script?'),
     'confirmText' => scriptlogs_t('"%s" will be started in the background.'),
     'confirmButton' => scriptlogs_t('Run in background'),
@@ -169,6 +170,30 @@ EOT;
 .scriptlogs-chip.sl-running .sl-dot {
     background: #4CAF50;
     animation: scriptlogs-running-dot-pulse 2.4s ease-in-out infinite;
+}
+.scriptlogs-chip .sl-chip-run {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin: -2px -5px -2px 0;
+    font-size: 9px;
+    border-radius: 50%;
+    color: var(--scriptlogs-accent);
+    cursor: pointer;
+}
+.scriptlogs-chip .sl-chip-run:hover,
+.scriptlogs-chip .sl-chip-run:focus-visible {
+    background: var(--scriptlogs-accent);
+    color: #fff;
+    outline: none;
+}
+.scriptlogs-chip .sl-chip-run.sl-disabled {
+    color: var(--scriptlogs-footer-text);
+    background: transparent;
+    cursor: default;
+    opacity: 0.5;
 }
 #scriptlogs-tab-shell {
     position: relative;
@@ -482,6 +507,16 @@ EOT;
             var chip = $('<div>').addClass('scriptlogs-chip').toggleClass('sl-running', isRunning);
             $('<span>').addClass('sl-dot').appendTo(chip);
             $('<span>').text(script.name).appendTo(chip);
+            if (!isRunning && script.name) {
+                var runTitle = scriptlogs_text('runTitleNamed', 'Run "%s" in the background').replace('%s', script.name);
+                $('<span>')
+                    .addClass('sl-chip-run')
+                    .toggleClass('sl-disabled', scriptlogs_is_launching(script.name))
+                    .attr({ role: 'button', tabindex: '0', title: runTitle, 'aria-label': runTitle })
+                    .data('script-name', script.name)
+                    .append($('<i>').addClass('fa fa-play'))
+                    .appendTo(chip);
+            }
             chips.append(chip);
         });
     }
@@ -527,6 +562,11 @@ EOT;
 
         var disabled = !scriptName || isRunning || scriptlogs_is_launching(scriptName);
         button.toggleClass('sl-disabled', disabled).attr('aria-disabled', disabled ? 'true' : 'false');
+
+        $('#scriptlogs-chips').find('.sl-chip-run').each(function() {
+            var chipRun = $(this);
+            chipRun.toggleClass('sl-disabled', scriptlogs_is_launching(chipRun.data('script-name')));
+        });
     }
 
     function scriptlogs_show_run_error(message) {
@@ -601,6 +641,23 @@ EOT;
         var tab = scriptlogs_selected_tab();
         var scriptName = tab.length ? tab.data('script-name') : '';
         if (!scriptName) return;
+
+        scriptlogs_confirm_run(scriptName, function() {
+            scriptlogs_run_script(scriptName);
+        });
+    }
+
+    // Play control on a chip of the collapsed tile.
+    function scriptlogs_handle_chip_run(event) {
+        if (event.type === 'keydown') {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+        }
+        event.stopPropagation();
+
+        var chipRun = $(this);
+        var scriptName = chipRun.data('script-name');
+        if (!scriptName || chipRun.hasClass('sl-disabled') || scriptlogs_is_launching(scriptName)) return;
 
         scriptlogs_confirm_run(scriptName, function() {
             scriptlogs_run_script(scriptName);
@@ -1005,6 +1062,7 @@ EOT;
             .on('keydown', '.scriptlogs-tab', scriptlogs_handle_tab_keydown);
 
         $('#scriptlogs-run').on('click keydown', scriptlogs_handle_run_click);
+        $('#scriptlogs-chips').on('click keydown', '.sl-chip-run', scriptlogs_handle_chip_run);
 
         $('#scriptlogs-autoscroll').on('change', function() {
             if ($(this).is(':checked')) {

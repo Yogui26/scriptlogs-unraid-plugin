@@ -1,3 +1,6 @@
+### 2026.11.15a
+- Fork: added a small play control on each idle script chip of the collapsed dashboard tile, with the same confirmation prompt.
+
 ### 2026.11.15
 - Fork (Yogui26): added a Run button to the dashboard tile that starts the selected script in the background through User Scripts, after a confirmation prompt.
 - Fork: the plugin now installs and updates from the Yogui26 repository.
