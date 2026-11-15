@@ -1,10 +1,27 @@
 <h1><img src="source/scriptlogs.png" alt="ScriptLogs icon" width="42"> ScriptLogs for Unraid</h1>
 
-> Fork of [jo-sobo/scriptlogs-unraid-plugin](https://github.com/jo-sobo/scriptlogs-unraid-plugin) that adds a **Run** button to start the selected script in the background from the dashboard.
+> Fork of [jo-sobo/scriptlogs-unraid-plugin](https://github.com/jo-sobo/scriptlogs-unraid-plugin). It keeps everything from the original plugin and adds the ability to **start scripts** and **open their full log** from the dashboard tile. See [What This Fork Adds](#what-this-fork-adds).
 
-ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows script status and log output directly on the Unraid Dashboard, without keeping the User Scripts page open.
+ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows script status and log output directly on the Unraid Dashboard, and lets you start a script in the background, without keeping the User Scripts page open.
+
+## What This Fork Adds
+
+| Addition | Where | What it does |
+| --- | --- | --- |
+| **Run** button | Expanded tile, below the log | Starts the script of the selected tab in the background, after a confirmation prompt. Disabled while that script is running. |
+| Play control (▶) | Collapsed tile, on each idle script chip | Starts that script in the background, after the same confirmation prompt. Not shown on running scripts. |
+| **Full log** button | Expanded tile, next to **Run** | Opens the whole background log of the selected script as plain text in a new browser tab. The tile itself only shows the last 100 lines. |
+
+Scripts are always started **in the background**, exactly like the **Run In Background** button of User Scripts, so they keep running after the dashboard is closed. There is no stop button: use **Abort Script** on the User Scripts page.
+
+Other changes:
+
+- The plugin installs and updates from this repository instead of the upstream one.
+- `build.sh` works with GNU tar (Linux) as well as bsdtar (macOS), and the package is served from `packages/` on `main`, so no GitHub release is needed.
 
 ## Screenshots
+
+The screenshots below come from the original plugin and do not show the buttons added by this fork.
 
 <p>
   <img src="scriptlogs_screenshot_slim.png" alt="Compact ScriptLogs dashboard widget" width="48%">
@@ -23,9 +40,9 @@ ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows s
 - Custom dashboard order for selected scripts.
 - Scrollable log viewer with optional auto-scroll.
 - Live log output for scripts running in the background.
-- Run button to start the selected script in the background, with a confirmation prompt (this fork).
+- **Run** button to start the selected script in the background, with a confirmation prompt (this fork).
 - Play control on each idle script chip when the tile is collapsed (this fork).
-- Full log button on the expanded tile to open the whole log of the selected script in a new tab (this fork).
+- **Full log** button on the expanded tile to open the whole log of the selected script in a new tab (this fork).
 - Optional display of the last known background log for idle scripts.
 - Configurable refresh interval.
 - Configurable log font size.
@@ -40,7 +57,7 @@ ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows s
 
 ## Installation
 
-The upstream plugin is available through Unraid Community Applications. To install this fork (it replaces the upstream plugin, settings are kept):
+The original plugin is available through Unraid Community Applications; this fork is installed manually. It uses the same plugin name, so it replaces the original plugin if it is installed, and existing settings are kept.
 
 1. Open the Unraid web interface.
 2. Go to **Plugins**.
@@ -50,6 +67,8 @@ The upstream plugin is available through Unraid Community Applications. To insta
    ```text
    https://raw.githubusercontent.com/Yogui26/scriptlogs-unraid-plugin/main/scriptlogs.plg
    ```
+
+Later versions are picked up by **Plugins > Check for Updates**.
 
 ## Configuration
 
@@ -67,6 +86,8 @@ Available settings:
 
 Click **Apply** to save changes. The dashboard widget updates on the next refresh.
 
+The script selection also defines which scripts can be started and whose full log can be opened from the dashboard. The additions of this fork have no settings of their own.
+
 ## How It Works
 
 The dashboard widget polls a local plugin API at the configured refresh interval.
@@ -82,27 +103,46 @@ Log output is read from User Scripts log files in:
 /tmp/user.scripts/tmpScripts/<script-name>/log.txt
 ```
 
-The **Run** button asks for confirmation, then starts the selected script exactly like the **Run In Background** button of User Scripts (copy to `/tmp/user.scripts/tmpScripts/<script-name>/script`, then `backgroundScript.sh`). Only scripts selected in the ScriptLogs settings can be started, and never while they are already running. Scripts marked `foregroundOnly`, or `arrayStarted` while the array is stopped, are refused.
-
 ScriptLogs tails the most recent log output, optionally removes empty lines, and displays it in the dashboard tile. It preserves the selected tab across refreshes when possible. Foreground scripts still write their live output to the User Scripts window, so ScriptLogs shows a short notice instead of duplicating that stream.
+
+### Starting a Script (this fork)
+
+The **Run** button and the play control on the chips ask for confirmation, then send a CSRF-protected `POST` (`action=run_script`) to the plugin API. The API starts the script the same way the **Run In Background** button of User Scripts does: it copies the script to `/tmp/user.scripts/tmpScripts/<script-name>/script` and hands it to User Scripts' `backgroundScript.sh`, which detaches it with `at`. The tile then shows the script as running and follows its log.
+
+A launch is refused when:
+
+- the script is not selected in the ScriptLogs settings;
+- the script is already running, in the foreground or in the background;
+- the script is marked `foregroundOnly`;
+- the script is marked `arrayStarted` and the array is stopped;
+- the script name contains shell metacharacters (such as `;`, `$`, `&`, quotes or parentheses).
+
+Each launch is written to the syslog with the `scriptlogs` tag.
+
+### Full Log (this fork)
+
+The **Full log** button opens `scriptlogs_api.php?action=get_full_log&script=<script-name>` in a new browser tab, which returns the whole `log.txt` of the script as plain text. Reload the tab to see new output while the script is running.
+
+Only scripts selected in the ScriptLogs settings are served. User Scripts writes `log.txt` for background runs only and keeps it in `/tmp`, so no log is available for a script that has only run in the foreground, or that has not run since the last boot.
 
 ## Support
 
-For general support, use the Unraid forum thread:
+For the additions of this fork (Run button, play control, Full log button), use this repository:
 
-https://forums.unraid.net/topic/192397-plugin-scriptlogs
+https://github.com/Yogui26/scriptlogs-unraid-plugin
 
-Source code and issue tracking are on GitHub:
+For the original plugin, use the Unraid forum thread and the upstream repository. Please do not report problems with this fork there.
 
-https://github.com/jo-sobo/scriptlogs-unraid-plugin/issues
+- https://forums.unraid.net/topic/192397-plugin-scriptlogs
+- https://github.com/jo-sobo/scriptlogs-unraid-plugin/issues
 
 ## Acknowledgments
 
-Thanks to Andrew Zawadzki for creating and maintaining the User Scripts plugin.
+Thanks to jo-sobo for creating ScriptLogs, and to Andrew Zawadzki for creating and maintaining the User Scripts plugin.
 
 ## Donation
 
-If ScriptLogs is useful to you, donations are welcome:
+If ScriptLogs is useful to you, donations to its original author are welcome:
 
 https://coff.ee/magnum.308
 
