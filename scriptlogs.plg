@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
  <!ENTITY name "scriptlogs">
  <!ENTITY author "Yogui26">
- <!ENTITY version "2026.11.15a">
+ <!ENTITY version "2026.11.15b">
  <!ENTITY branch "main">
  <!ENTITY displayName "ScriptLogs">
  <!ENTITY gitURL "https://github.com/Yogui26/scriptlogs-unraid-plugin">
@@ -14,6 +14,9 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&selfURL;" min="6.9.0" support="&supportURL;">
 
 <CHANGES>
+### 2026.11.15b
+- Fork: added a Full log button to the expanded dashboard tile that opens the whole background log of the selected script in a new browser tab.
+
 ### 2026.11.15a
 - Fork: added a small play control on each idle script chip of the collapsed dashboard tile, with the same confirmation prompt.
 
@@ -63,7 +66,7 @@
 
 <FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
 <URL>&pluginURL;</URL>
-<MD5>fadcbab2a6fdda688926cc52c82339e1</MD5>
+<MD5>041ac7347ad32f43f3394643b0410ff0</MD5>
 </FILE>
 
 <FILE Name="/boot/config/plugins/&name;/&name;.cfg">

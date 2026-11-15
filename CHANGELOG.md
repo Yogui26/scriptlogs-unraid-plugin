@@ -1,3 +1,6 @@
+### 2026.11.15b
+- Fork: added a Full log button to the expanded dashboard tile that opens the whole background log of the selected script in a new browser tab.
+
 ### 2026.11.15a
 - Fork: added a small play control on each idle script chip of the collapsed dashboard tile, with the same confirmation prompt.
 

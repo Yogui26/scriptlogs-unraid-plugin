@@ -25,6 +25,7 @@ ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows s
 - Live log output for scripts running in the background.
 - Run button to start the selected script in the background, with a confirmation prompt (this fork).
 - Play control on each idle script chip when the tile is collapsed (this fork).
+- Full log button on the expanded tile to open the whole log of the selected script in a new tab (this fork).
 - Optional display of the last known background log for idle scripts.
 - Configurable refresh interval.
 - Configurable log font size.

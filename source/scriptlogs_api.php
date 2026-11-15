@@ -129,6 +129,38 @@ if ($scriptlogs_request_method !== 'GET') {
     exit('Only GET and POST requests allowed');
 }
 
+if (($_GET['action'] ?? '') === 'get_full_log') {
+    // Whole background log of one selected script, as plain text.
+    header('Content-Type: text/plain; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: no-cache, must-revalidate');
+
+    $cfg = scriptlogs_read_cfg('scriptlogs');
+    $script_name = isset($_GET['script']) ? trim((string)$_GET['script']) : '';
+    $enabled_scripts = scriptlogs_parse_enabled_scripts($cfg['ENABLED_SCRIPTS'] ?? '');
+
+    if (!scriptlogs_is_safe_script_name($script_name) || !in_array($script_name, $enabled_scripts, true)) {
+        header('HTTP/1.1 403 Forbidden');
+        exit(scriptlogs_t('This script is not selected in the ScriptLogs settings.'));
+    }
+
+    $log_file = "/tmp/user.scripts/tmpScripts/{$script_name}/log.txt";
+    if (!@is_file($log_file) || !@is_readable($log_file)) {
+        header('HTTP/1.1 404 Not Found');
+        exit(scriptlogs_t('No log found for this script (it has not run in the background since the last boot, or its log was deleted).'));
+    }
+
+    $size = @filesize($log_file);
+    if ($size !== false) {
+        header('Content-Length: ' . $size);
+    }
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    @readfile($log_file);
+    exit;
+}
+
 if (!isset($_GET['action']) || $_GET['action'] !== 'get_script_states') {
     header('HTTP/1.1 400 Bad Request');
     header('Content-Type: application/json');
