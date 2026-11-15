@@ -97,9 +97,36 @@ function scriptlogs_format_tail_text($tail)
     return $text;
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+$scriptlogs_request_method = $_SERVER['REQUEST_METHOD'] ?? '';
+
+if ($scriptlogs_request_method === 'POST') {
+    // Unraid's webGui validates csrf_token on every POST before this file runs
+    // (auto-prepended local_prepend.php), so a forged request never gets here.
+    header('Content-Type: application/json');
+    header('Cache-Control: no-cache, must-revalidate');
+
+    if (($_POST['action'] ?? '') !== 'run_script') {
+        header('HTTP/1.1 400 Bad Request');
+        echo json_encode(['ok' => false, 'message' => 'Invalid action'], scriptlogs_json_options());
+        exit;
+    }
+
+    $cfg = scriptlogs_read_cfg('scriptlogs');
+    $result = scriptlogs_start_background_script(
+        isset($_POST['script']) ? (string)$_POST['script'] : '',
+        scriptlogs_parse_enabled_scripts($cfg['ENABLED_SCRIPTS'] ?? '')
+    );
+
+    if (!$result['ok']) {
+        http_response_code($result['http_status']);
+    }
+    echo json_encode(['ok' => $result['ok'], 'message' => $result['message']], scriptlogs_json_options());
+    exit;
+}
+
+if ($scriptlogs_request_method !== 'GET') {
     header('HTTP/1.1 405 Method Not Allowed');
-    exit('Only GET requests allowed');
+    exit('Only GET and POST requests allowed');
 }
 
 if (!isset($_GET['action']) || $_GET['action'] !== 'get_script_states') {

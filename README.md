@@ -1,5 +1,7 @@
 <h1><img src="source/scriptlogs.png" alt="ScriptLogs icon" width="42"> ScriptLogs for Unraid</h1>
 
+> Fork of [jo-sobo/scriptlogs-unraid-plugin](https://github.com/jo-sobo/scriptlogs-unraid-plugin) that adds a **Run** button to start the selected script in the background from the dashboard.
+
 ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows script status and log output directly on the Unraid Dashboard, without keeping the User Scripts page open.
 
 ## Screenshots
@@ -21,6 +23,7 @@ ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows s
 - Custom dashboard order for selected scripts.
 - Scrollable log viewer with optional auto-scroll.
 - Live log output for scripts running in the background.
+- Run button to start the selected script in the background, with a confirmation prompt (this fork).
 - Optional display of the last known background log for idle scripts.
 - Configurable refresh interval.
 - Configurable log font size.
@@ -35,9 +38,7 @@ ScriptLogs adds a compact dashboard widget for selected User Scripts. It shows s
 
 ## Installation
 
-ScriptLogs is available through Unraid Community Applications.
-
-For manual installation:
+The upstream plugin is available through Unraid Community Applications. To install this fork (it replaces the upstream plugin, settings are kept):
 
 1. Open the Unraid web interface.
 2. Go to **Plugins**.
@@ -45,7 +46,7 @@ For manual installation:
 4. Paste this URL and install:
 
    ```text
-   https://raw.githubusercontent.com/jo-sobo/scriptlogs-unraid-plugin/main/scriptlogs.plg
+   https://raw.githubusercontent.com/Yogui26/scriptlogs-unraid-plugin/main/scriptlogs.plg
    ```
 
 ## Configuration
@@ -78,6 +79,8 @@ Log output is read from User Scripts log files in:
 ```text
 /tmp/user.scripts/tmpScripts/<script-name>/log.txt
 ```
+
+The **Run** button asks for confirmation, then starts the selected script exactly like the **Run In Background** button of User Scripts (copy to `/tmp/user.scripts/tmpScripts/<script-name>/script`, then `backgroundScript.sh`). Only scripts selected in the ScriptLogs settings can be started, and never while they are already running. Scripts marked `foregroundOnly`, or `arrayStarted` while the array is stopped, are refused.
 
 ScriptLogs tails the most recent log output, optionally removes empty lines, and displays it in the dashboard tile. It preserves the selected tab across refreshes when possible. Foreground scripts still write their live output to the User Scripts window, so ScriptLogs shows a short notice instead of duplicating that stream.
 

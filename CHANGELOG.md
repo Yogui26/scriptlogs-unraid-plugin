@@ -1,3 +1,7 @@
+### 2026.11.15
+- Fork (Yogui26): added a Run button to the dashboard tile that starts the selected script in the background through User Scripts, after a confirmation prompt.
+- Fork: the plugin now installs and updates from the Yogui26 repository.
+
 ### 2026.06.19
 - Fixed duplicate ScriptLogs settings entries after the branding rename by removing obsolete page files during updates while preserving user configuration.
 

@@ -15,7 +15,15 @@ $scriptlogs_text = [
     'autoScroll' => scriptlogs_t('Auto-scroll'),
     'lastUpdate' => scriptlogs_t('Last Update:'),
     'noScripts' => scriptlogs_t('No scripts selected to display.'),
-    'loadError' => scriptlogs_t('Error loading script states. Check browser console (F12) for details.')
+    'loadError' => scriptlogs_t('Error loading script states. Check browser console (F12) for details.'),
+    'run' => scriptlogs_t('Run'),
+    'runTitle' => scriptlogs_t('Run the selected script in the background'),
+    'confirmTitle' => scriptlogs_t('Run script?'),
+    'confirmText' => scriptlogs_t('"%s" will be started in the background.'),
+    'confirmButton' => scriptlogs_t('Run in background'),
+    'cancelButton' => scriptlogs_t('Cancel'),
+    'runErrorTitle' => scriptlogs_t('Script not started'),
+    'runError' => scriptlogs_t('The script could not be started.')
 ];
 $scriptlogs_text_js = json_encode($scriptlogs_text, scriptlogs_json_options());
 if (!is_string($scriptlogs_text_js)) {
@@ -42,6 +50,12 @@ $settings_title = htmlspecialchars($scriptlogs_text['settings'], ENT_QUOTES, 'UT
 $select_script_text = htmlspecialchars($scriptlogs_text['selectScript'], ENT_QUOTES, 'UTF-8');
 $auto_scroll_text = htmlspecialchars($scriptlogs_text['autoScroll'], ENT_QUOTES, 'UTF-8');
 $last_update_text = htmlspecialchars($scriptlogs_text['lastUpdate'], ENT_QUOTES, 'UTF-8');
+$run_text = htmlspecialchars($scriptlogs_text['run'], ENT_QUOTES, 'UTF-8');
+$run_title = htmlspecialchars($scriptlogs_text['runTitle'], ENT_QUOTES, 'UTF-8');
+$scriptlogs_csrf_js = json_encode((string)($var['csrf_token'] ?? ''), scriptlogs_json_options());
+if (!is_string($scriptlogs_csrf_js)) {
+    $scriptlogs_csrf_js = '""';
+}
 
 $pluginname = 'scriptlogs';
 
@@ -90,7 +104,10 @@ $mytiles[$pluginname]['column1'] = <<<EOT
                 <pre id="scriptlogs-logs" role="tabpanel">{$select_script_text}</pre>
             </div>
             <div id="scriptlogs-footer">
-                <label><input type="checkbox" id="scriptlogs-autoscroll" checked> {$auto_scroll_text}</label>
+                <span id="scriptlogs-footer-left">
+                    <span id="scriptlogs-run" class="sl-disabled" role="button" tabindex="0" aria-disabled="true" title="{$run_title}"><i class="fa fa-play"></i> {$run_text}</span>
+                    <label><input type="checkbox" id="scriptlogs-autoscroll" checked> {$auto_scroll_text}</label>
+                </span>
                 <span><span class="scriptlogs-updated-at">{$last_update_text}</span> <span id="scriptlogs-timestamp"></span></span>
             </div>
         </td>
@@ -401,6 +418,39 @@ EOT;
     cursor: pointer;
     color: var(--scriptlogs-footer-label);
 }
+#scriptlogs-footer-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+#scriptlogs-run {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1.5;
+    border: 1px solid var(--scriptlogs-accent);
+    color: var(--scriptlogs-accent);
+    background: transparent;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+#scriptlogs-run:hover,
+#scriptlogs-run:focus-visible {
+    background: var(--scriptlogs-accent);
+    color: #fff;
+    outline: none;
+}
+#scriptlogs-run.sl-disabled {
+    border-color: var(--scriptlogs-border-soft);
+    color: var(--scriptlogs-footer-text);
+    background: transparent;
+    cursor: default;
+    opacity: 0.6;
+}
 #scriptlogs-footer input[type="checkbox"] {
     width: 11px;
     height: 11px;
@@ -416,6 +466,9 @@ EOT;
     var refreshEnabled = <?=json_encode($refresh_enabled)?>;
     var refreshInterval = <?=json_encode($refresh_interval_ms)?>;
     var scriptlogsRequest = null;
+    var scriptlogsCsrfToken = <?=$scriptlogs_csrf_js?>;
+    var scriptlogsLaunching = {};
+    var scriptlogsLaunchGraceMs = 15000;
 
     function scriptlogs_text(key, fallback) {
         return scriptlogsText && scriptlogsText[key] ? scriptlogsText[key] : fallback;
@@ -440,6 +493,118 @@ EOT;
         $('#scriptlogs-timestamp').text(new Date().toLocaleTimeString());
         scriptlogs_sync_tab_scrollbar();
         scriptlogs_update_selected_join();
+        scriptlogs_update_run_button();
+    }
+
+    function scriptlogs_selected_tab() {
+        return $('#scriptlogs-tab-bar').find('.scriptlogs-tab.sl-selected').first();
+    }
+
+    function scriptlogs_is_launching(scriptName) {
+        var startedAt = scriptlogsLaunching[scriptName];
+        if (!startedAt) return false;
+        if (Date.now() - startedAt > scriptlogsLaunchGraceMs) {
+            delete scriptlogsLaunching[scriptName];
+            return false;
+        }
+        return true;
+    }
+
+    // The run button always targets the selected tab. It is disabled while that
+    // script runs, and for a short grace period after a launch until User
+    // Scripts reports it as running.
+    function scriptlogs_update_run_button() {
+        var button = $('#scriptlogs-run');
+        if (button.length === 0) return;
+
+        var tab = scriptlogs_selected_tab();
+        var scriptName = tab.length ? tab.data('script-name') : '';
+        var isRunning = tab.length ? tab.data('script-status') === 'running' : false;
+
+        if (scriptName && isRunning) {
+            delete scriptlogsLaunching[scriptName];
+        }
+
+        var disabled = !scriptName || isRunning || scriptlogs_is_launching(scriptName);
+        button.toggleClass('sl-disabled', disabled).attr('aria-disabled', disabled ? 'true' : 'false');
+    }
+
+    function scriptlogs_show_run_error(message) {
+        var text = message || scriptlogs_text('runError', 'The script could not be started.');
+        if (typeof swal === 'function') {
+            swal({
+                title: scriptlogs_text('runErrorTitle', 'Script not started'),
+                text: text,
+                type: 'error'
+            });
+        } else {
+            window.alert(text);
+        }
+    }
+
+    function scriptlogs_confirm_run(scriptName, onConfirm) {
+        var text = scriptlogs_text('confirmText', '"%s" will be started in the background.').replace('%s', scriptName);
+        if (typeof swal === 'function') {
+            swal({
+                title: scriptlogs_text('confirmTitle', 'Run script?'),
+                text: text,
+                type: 'warning',
+                html: false,
+                showCancelButton: true,
+                closeOnConfirm: true,
+                confirmButtonText: scriptlogs_text('confirmButton', 'Run in background'),
+                cancelButtonText: scriptlogs_text('cancelButton', 'Cancel')
+            }, function(confirmed) {
+                if (confirmed) onConfirm();
+            });
+        } else if (window.confirm(scriptlogs_text('confirmTitle', 'Run script?') + '\n\n' + text)) {
+            onConfirm();
+        }
+    }
+
+    function scriptlogs_run_script(scriptName) {
+        scriptlogsLaunching[scriptName] = Date.now();
+        scriptlogs_update_run_button();
+
+        $.ajax({
+            url: '/plugins/scriptlogs/scriptlogs_api.php',
+            method: 'POST',
+            dataType: 'json',
+            timeout: 15000,
+            data: { action: 'run_script', script: scriptName, csrf_token: scriptlogsCsrfToken }
+        }).done(function(result) {
+            if (!result || !result.ok) {
+                delete scriptlogsLaunching[scriptName];
+                scriptlogs_show_run_error(result && result.message);
+            }
+        }).fail(function(jqXHR) {
+            delete scriptlogsLaunching[scriptName];
+            var message = jqXHR && jqXHR.responseJSON && jqXHR.responseJSON.message;
+            scriptlogs_show_run_error(message);
+        }).always(function() {
+            scriptlogs_update_run_button();
+            // at(1) starts the job a moment later, so look again shortly after.
+            setTimeout(scriptlogs_status, 1500);
+            setTimeout(scriptlogs_status, 5000);
+            setTimeout(scriptlogs_update_run_button, scriptlogsLaunchGraceMs + 100);
+        });
+    }
+
+    function scriptlogs_handle_run_click(event) {
+        if (event.type === 'keydown') {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+        }
+
+        if ($('#scriptlogs-run').hasClass('sl-disabled')) return;
+
+        var tab = scriptlogs_selected_tab();
+        var scriptName = tab.length ? tab.data('script-name') : '';
+        if (!scriptName) return;
+
+        scriptlogs_confirm_run(scriptName, function() {
+            scriptlogs_run_script(scriptName);
+        });
     }
 
     function scriptlogs_scroll_log_to_bottom(logEl) {
@@ -670,6 +835,7 @@ EOT;
         logDisplay.attr('aria-labelledby', selectedTab.attr('id') || '');
 
         scriptlogs_update_selected_join();
+        scriptlogs_update_run_button();
         if (shouldScroll && $('#scriptlogs-autoscroll').is(':checked')) {
             scriptlogs_scroll_log_to_bottom(logBox[0]);
         }
@@ -701,6 +867,7 @@ EOT;
             tab.toggleClass('sl-running', isRunning)
                 .data('script-name', scriptName)
                 .data('log-content', script.log || '')
+                .data('script-status', isRunning ? 'running' : 'idle')
                 .attr('id', scriptlogs_tab_id(scriptName))
                 .attr('aria-controls', 'scriptlogs-logs')
                 .attr('aria-label', scriptName);
@@ -836,6 +1003,8 @@ EOT;
                 scriptlogs_select_tab($(this), true);
             })
             .on('keydown', '.scriptlogs-tab', scriptlogs_handle_tab_keydown);
+
+        $('#scriptlogs-run').on('click keydown', scriptlogs_handle_run_click);
 
         $('#scriptlogs-autoscroll').on('change', function() {
             if ($(this).is(':checked')) {

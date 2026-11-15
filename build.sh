@@ -3,9 +3,9 @@ set -euo pipefail
 
 PLUGIN_NAME="scriptlogs"
 PLUGIN_DISPLAY_NAME="ScriptLogs"
-AUTHOR="jo-sobo"
+AUTHOR="Yogui26"
 GIT_URL="https://github.com/${AUTHOR}/scriptlogs-unraid-plugin"
-SUPPORT_URL="https://forums.unraid.net/topic/192397-plugin-scriptlogs"
+SUPPORT_URL="${GIT_URL}"
 PACKAGE_DIR_FINAL="packages"
 PACKAGE_DIR_TEMP="package-temp"
 CHANGELOG_FILE="CHANGELOG.md"
@@ -37,7 +37,8 @@ if [[ "$STAGE_INPUT" == "dev" ]]; then
 ${CHANGELOG_TEXT}"
 else
   BRANCH="main"
-  PLUGIN_URL_STRUCTURE="&gitURL;/releases/download/&version;/&name;-&version;.txz"
+  # Fork: install straight from the committed package, no GitHub release needed.
+  PLUGIN_URL_STRUCTURE="&gitURL;/raw/&branch;/packages/&name;-&version;.txz"
   CHANGES_TEXT="${CHANGELOG_TEXT}"
 fi
 
@@ -60,7 +61,13 @@ FILENAME="${PLUGIN_NAME}-${VERSION}"
 PACKAGE_PATH="${PACKAGE_DIR_FINAL}/${FILENAME}.txz"
 
 echo "Creating package: ${FILENAME}.txz"
-COPYFILE_DISABLE=1 tar -C "${PACKAGE_DIR_TEMP}" --uid 0 --gid 0 --numeric-owner -cJf "${PACKAGE_PATH}" usr
+# bsdtar (macOS) and GNU tar (Linux) spell the root-ownership options differently.
+if tar --version 2>/dev/null | grep -qi 'bsdtar'; then
+    TAR_OWNER_ARGS=(--uid 0 --gid 0 --numeric-owner)
+else
+    TAR_OWNER_ARGS=(--owner=0 --group=0 --numeric-owner)
+fi
+COPYFILE_DISABLE=1 tar -C "${PACKAGE_DIR_TEMP}" "${TAR_OWNER_ARGS[@]}" -cJf "${PACKAGE_PATH}" usr
 
 if [ ! -f "${PACKAGE_PATH}" ]; then
     echo "Error: Package creation failed!"
